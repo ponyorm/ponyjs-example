@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>PonyJS example</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <script src="/static/js/jquery.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+    <script src="/static/js/knockout.js"></script>
+    <script src="/static/js/underscore.js"></script>
+    <script src="/static/js/pony.js"></script>
+    <script type="text/javascript">
+        var model = {
+            departments: ko.observableArray([]),
+            groups: ko.observableArray([]),
+            courses: ko.observableArray([]),
+            students: ko.observableArray([]),
+            selectedDept: ko.observable(),
+            selectedCourse: ko.observable(),
+            selectedGroup: ko.observable(),
+            studentsOf: ko.observable(),
+            onDeptClick: function(dept) {
+                model.students.removeAll();
+                model.selectedDept(dept);
+                model.selectedCourse(undefined);
+                model.selectedGroup(undefined);
+                model.groups(model.selectedDept().groups());
+                model.courses(model.selectedDept().courses());
+            },
+            onGroupClick: function(group) {
+                model.selectedCourse(undefined);
+                getData('/group-students/' + group.number(), function(data) {
+                    model.students(data.students);
+                    model.selectedGroup(group);
+                })
+            },
+            onCourseClick: function(course) {
+                model.selectedGroup(undefined);
+                getData('/course-students/' + course.name() + '/' + course.semester(), function(data) {
+                    model.students(data.students);
+                    model.selectedCourse(course);
+                })
+            },
+            saveClicked: function() {
+                $.ajax({
+                    url: '/update',
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        ormdata: JSON.stringify(pony.getChanges())
+                    },
+                    success: function() {
+                        location.reload();
+                    }
+                })
+            },
+            cancelClicked: function() {
+                location.reload();
+            }
+        };
+        var getData = function(url, func) {
+            $.ajax({
+                url: url,
+                dataType: 'json',
+                success: function(json) {
+                    var data = pony.unmarshalData(json);
+                    func(data);
+                }
+            })
+        };
+        $().ready(function() {
+            getData('/departments', function(data) {
+                model.departments(data);
+            });
+            ko.applyBindings(model);
+        });
+    </script>
+    <style>
+        body {
+            padding-top: 70px;
+        }
+        td {
+            cursor: pointer;
+        }
+        caption {
+            font-weight: bold;
+        }
+        .margin-top-8 {
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="/">PonyJS example</a>
+            </div>
+            <button class="btn btn-success margin-top-8" data-bind="visible: pony.cache_modified, click: saveClicked">Save</button>
+            <button class="btn btn-danger margin-top-8" data-bind="visible: pony.cache_modified, click: cancelClicked">Cancel</button>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-7">
+                <table class="table table-bordered">
+                    <caption>Departments</caption>
+                    <thead>
+                        <tr>
+                            <th class="text-center">Number</th>
+                            <th class="text-center">Name</th>
+                        </tr>
+                    </thead>
+                    <tbody data-bind="foreach: departments">
+                        <tr data-bind="click: $root.onDeptClick">
+                            <td data-bind="text: number" class="text-center"></td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: name, valueUpdate:'afterkeydown'">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-lg-5"></div>
+        </div>
+        <div class="row">
+            <div class="col-lg-4">
+                <table class="table table-bordered" data-bind="if: groups().length > 0">
+                    <caption data-bind="text: 'Groups of department ' + selectedDept().number()"></caption>
+                    <thead>
+                        <tr>
+                            <th class="text-center">Number</th>
+                            <th class="text-center">Major</th>
+                        </tr>
+                    </thead>
+                    <tbody data-bind="foreach: groups">
+                        <tr data-bind="click: $root.onGroupClick">
+                            <td data-bind="text: number" class="text-center"></td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: major, valueUpdate:'afterkeydown'">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-lg-8">
+                <table class="table table-bordered" data-bind="if: courses().length > 0">
+                    <caption data-bind="text: 'Courses of Department ' + selectedDept().number()"></caption>
+                    <thead>
+                        <tr>
+                            <th class="text-center">Name</th>
+                            <th class="text-center">Semester</th>
+                            <th class="text-center">Lect Hours</th>
+                            <th class="text-center">Lab Hours</th>
+                            <th class="text-center">Credits</th>
+                        </tr>
+                    </thead>
+                    <tbody data-bind="foreach: courses">
+                        <tr data-bind="click: $root.onCourseClick">
+                            <td data-bind="text: name" class="text-center"></td>
+                            <td data-bind="text: semester" class="text-center"></td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: lect_hours, valueUpdate:'afterkeydown'">
+                            </td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: lab_hours, valueUpdate:'afterkeydown'">
+                            </td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: credits, valueUpdate:'afterkeydown'">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-lg-8">
+                <table class="table table-bordered" data-bind="if: selectedGroup() || students().length > 0">
+                    <caption data-bind="if: selectedGroup">Students of group
+                        <span data-bind="text: selectedGroup().number"></span>
+                    </caption>
+                    <caption data-bind="if: selectedCourse">Students attending course
+                        <span data-bind="text: selectedCourse().name() + ' semester ' + selectedCourse().semester()"></span>
+                    </caption>
+                    <thead>
+                        <tr>
+                            <th class="text-center">ID</th>
+                            <th class="text-center">Name</th>
+                            <th class="text-center">DOB</th>
+                            <th class="text-center">GPA</th>
+                        </tr>
+                    </thead>
+                    <tbody data-bind="foreach: students">
+                        <tr>
+                            <td data-bind="text: id" class="text-center"></td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: name, valueUpdate:'afterkeydown'">
+                            </td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: dob, valueUpdate:'afterkeydown'">
+                            </td>
+                            <td>
+                                <input type="text" class="form-control" data-bind="value: gpa, valueUpdate:'afterkeydown'">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-lg-4"></div>
+        </div>
+    </div>
+</body>
+</html>
